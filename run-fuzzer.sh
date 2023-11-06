@@ -66,7 +66,7 @@ TOOLCHAIN_ROOT=${RUSTUP_BASE:-$HOME/.rustup}/toolchains/nightly-$TARGET
 # we may need to compile our own libstd. `./x.py build --stage 1` should suffice.
 # If fuzzing immediately fails on an empty input, this is a good thing to try.
 # (Note that you will also need to change CFG_VERSION, above.)
-#TOOLCHAIN_ROOT=$HOME/src/rust/build/x86_64-unknown-linux-gnu/stage1/
+#TOOLCHAIN_ROOT=$HOME/src/rust/build/$TARGET/stage1/
 
 # Custom environment variable indicating where to look for the precompiled libstd.
 export FUZZ_RUSTC_LIBRARY_DIR=$TOOLCHAIN_ROOT/lib/rustlib/$TARGET/lib
@@ -74,7 +74,7 @@ export FUZZ_RUSTC_LIBRARY_DIR=$TOOLCHAIN_ROOT/lib/rustlib/$TARGET/lib
 # Set some environment variables that are needed when building the rustc source code.
 export CFG_COMPILER_HOST_TRIPLE=$TARGET
 export CFG_RELEASE_CHANNEL=nightly
-export CFG_RELEASE=unknown
+export CFG_RELEASE=`rustc --version | cut -f2 -d ' ' | cut -f1 -d '-'`-dev
 export REAL_LIBRARY_PATH_VAR=foobar
 
 # Any writable location will do for this one.
@@ -90,9 +90,10 @@ export RUST_MIN_STACK=20000000
 cargo run --release --verbose --target $TARGET --bin "fuzz_target" -- -artifact_prefix=artifacts/ ${@:1} `pwd`/corpus `pwd`/seeds
 
 # An invocation like this can reduce a corpus:
-# Make sure NOT to pass -only_ascii=1 for this
+# NB: not passing in ${@:1} because max-length is meaningless and only_ascii breaks it at the last moment
+#./tests_as_seeds.sh
 #mkdir new-corpus
-#cargo run --release --verbose --target $TARGET --bin "fuzz_target" -- -artifact_prefix=artifacts/ ${@:1} -merge=1 `pwd`/new-corpus `pwd`/corpus `pwd`/seeds
+#cargo run --release --verbose --target $TARGET --bin "fuzz_target" -- -artifact_prefix=artifacts/ -merge=1 `pwd`/new-corpus `pwd`/corpus `pwd`/seeds-most-tests
 
 # An invocation like this can minimize a crash:
-#cargo run --release --verbose --target $TARGET --bin "fuzz_target" -- -minimize_crash=1 ${@:1}
+#cargo run --release --verbose --target $TARGET --bin "fuzz_target" -- -minimize_crash=1 -max_total_time=1200 ${@:1}
