@@ -1,28 +1,5 @@
-diff --git a/compiler/rustc_attr/src/builtin.rs b/compiler/rustc_attr/src/builtin.rs
-index 753f62dd589..278698378d0 100644
---- a/compiler/rustc_attr/src/builtin.rs
-+++ b/compiler/rustc_attr/src/builtin.rs
-@@ -679,7 +679,17 @@ pub fn eval_condition(
-                 sess.emit_warning(session_diagnostics::UnknownVersionLiteral { span: *span });
-                 return false;
-             };
--            let rustc_version = parse_version(env!("CFG_RELEASE"), true).unwrap();
-+            let rustc_version = match parse_version(env!("CFG_RELEASE"), true) {
-+                Some(v) => v,
-+                None => {
-+                    // For fuzzing:
-+                    // I don't know what this code is trying to do,
-+                    // or whether run-fuzzer.sh set up the env vars wrong,
-+                    // but for now let's just read another env var so we don't crash on the test
-+                    // rust/src/test/ui/feature-gates/feature-gate-cfg-version.rs
-+                    parse_version(env!("CFG_VERSION"), true).unwrap()
-+                }
-+            };
- 
-             // See https://github.com/rust-lang/rust/issues/64796#issuecomment-640851454 for details
-             if sess.assume_incomplete_release {
 diff --git a/compiler/rustc_driver/Cargo.toml b/compiler/rustc_driver/Cargo.toml
-index 59e93777748..705dda36dc2 100644
+index ae9712ad66d..81a113fe3f8 100644
 --- a/compiler/rustc_driver/Cargo.toml
 +++ b/compiler/rustc_driver/Cargo.toml
 @@ -4,7 +4,7 @@ version = "0.0.0"
@@ -33,83 +10,9 @@ index 59e93777748..705dda36dc2 100644
 +#crate-type = ["dylib"]
  
  [dependencies]
- tracing = { version = "0.1.35" }
-diff --git a/compiler/rustc_errors/src/diagnostic.rs b/compiler/rustc_errors/src/diagnostic.rs
-index 7d5e4723a6d..71783524c79 100644
---- a/compiler/rustc_errors/src/diagnostic.rs
-+++ b/compiler/rustc_errors/src/diagnostic.rs
-@@ -626,10 +626,11 @@ pub fn multipart_suggestion_with_style(
-         style: SuggestionStyle,
-     ) -> &mut Self {
-         assert!(!suggestion.is_empty());
--        debug_assert!(
--            !(suggestion.iter().any(|(sp, text)| sp.is_empty() && text.is_empty())),
--            "Span must not be empty and have no suggestion"
--        );
-+        // Commented out for fuzzing until https://github.com/rust-lang/rust/issues/103497 is fixed
-+        //debug_assert!(
-+        //    !(suggestion.iter().any(|(sp, text)| sp.is_empty() && text.is_empty())),
-+        //    "Span must not be empty and have no suggestion"
-+        //);
- 
-         self.push_suggestion(CodeSuggestion {
-             substitutions: vec![Substitution {
-@@ -708,10 +709,11 @@ pub fn span_suggestion_with_style(
-         applicability: Applicability,
-         style: SuggestionStyle,
-     ) -> &mut Self {
--        debug_assert!(
--            !(sp.is_empty() && suggestion.to_string().is_empty()),
--            "Span must not be empty and have no suggestion"
--        );
-+        // Commented out for fuzzing until https://github.com/rust-lang/rust/issues/103497 is fixed
-+        //debug_assert!(
-+        //    !(sp.is_empty() && suggestion.to_string().is_empty()),
-+        //    "Span must not be empty and have no suggestion"
-+        //);
-         self.push_suggestion(CodeSuggestion {
-             substitutions: vec![Substitution {
-                 parts: vec![SubstitutionPart { snippet: suggestion.to_string(), span: sp }],
-@@ -771,10 +773,11 @@ pub fn span_suggestions_with_style(
-         let mut suggestions: Vec<_> = suggestions.into_iter().collect();
-         suggestions.sort();
- 
--        debug_assert!(
--            !(sp.is_empty() && suggestions.iter().any(|suggestion| suggestion.is_empty())),
--            "Span must not be empty and have no suggestion"
--        );
-+        // Commented out for fuzzing until https://github.com/rust-lang/rust/issues/103497 is fixed
-+        //debug_assert!(
-+        //    !(sp.is_empty() && suggestions.iter().any(|suggestion| suggestion.is_empty())),
-+        //    "Span must not be empty and have no suggestion"
-+        //);
- 
-         let substitutions = suggestions
-             .into_iter()
-@@ -799,13 +802,14 @@ pub fn multipart_suggestions(
-         applicability: Applicability,
-     ) -> &mut Self {
-         let suggestions: Vec<_> = suggestions.into_iter().collect();
--        debug_assert!(
--            !(suggestions
--                .iter()
--                .flat_map(|suggs| suggs)
--                .any(|(sp, suggestion)| sp.is_empty() && suggestion.is_empty())),
--            "Span must not be empty and have no suggestion"
--        );
-+        // Commented out for fuzzing until https://github.com/rust-lang/rust/issues/103497 is fixed
-+        //debug_assert!(
-+        //    !(suggestions
-+        //        .iter()
-+        //        .flat_map(|suggs| suggs)
-+        //        .any(|(sp, suggestion)| sp.is_empty() && suggestion.is_empty())),
-+        //    "Span must not be empty and have no suggestion"
-+        //);
- 
-         self.push_suggestion(CodeSuggestion {
-             substitutions: suggestions
+ # tidy-alphabetical-start
 diff --git a/compiler/rustc_errors/src/styled_buffer.rs b/compiler/rustc_errors/src/styled_buffer.rs
-index 9abdb5fc97c..9814c688052 100644
+index 9aa14e1f214..cf09251c8d0 100644
 --- a/compiler/rustc_errors/src/styled_buffer.rs
 +++ b/compiler/rustc_errors/src/styled_buffer.rs
 @@ -29,7 +29,8 @@ pub fn new() -> StyledBuffer {
@@ -123,37 +26,42 @@ index 9abdb5fc97c..9814c688052 100644
          let mut output: Vec<Vec<StyledString>> = vec![];
          let mut styled_vec: Vec<StyledString> = vec![];
 diff --git a/compiler/rustc_interface/src/util.rs b/compiler/rustc_interface/src/util.rs
-index 2fe3fb2fa56..2871815d081 100644
+index 22d12793464..1a03e2b2098 100644
 --- a/compiler/rustc_interface/src/util.rs
 +++ b/compiler/rustc_interface/src/util.rs
-@@ -37,7 +37,7 @@ pub fn add_configuration(
-     cfg: &mut CrateConfig,
-     sess: &mut Session,
-     codegen_backend: &dyn CodegenBackend,
--) {
-+) {/* commented out for fuzzing because this leaks memory
+@@ -32,6 +32,9 @@
+ /// This is performed by checking whether a set of permitted features
+ /// is available on the target machine, by querying the codegen backend.
+ pub fn add_configuration(cfg: &mut Cfg, sess: &mut Session, codegen_backend: &dyn CodegenBackend) {
++    //commented out for fuzzing because this leaks memory
++    /* 
++
      let tf = sym::target_feature;
  
      let unstable_target_features = codegen_backend.target_features(sess, true);
-@@ -50,7 +50,7 @@ pub fn add_configuration(
- 
+@@ -45,6 +48,8 @@ pub fn add_configuration(cfg: &mut Cfg, sess: &mut Session, codegen_backend: &dy
      if sess.crt_static(None) {
          cfg.insert((tf, Some(sym::crt_dash_static)));
--    }
-+    } */
+     }
++
++    */
  }
  
- pub fn create_session(
+ const STACK_SIZE: usize = 8 * 1024 * 1024;
 diff --git a/compiler/rustc_middle/src/ty/error.rs b/compiler/rustc_middle/src/ty/error.rs
-index a61f41b9c58..50ae1e8fd5f 100644
+index 738bb5e8b19..9ad4295b9ff 100644
 --- a/compiler/rustc_middle/src/ty/error.rs
 +++ b/compiler/rustc_middle/src/ty/error.rs
-@@ -989,7 +989,7 @@ fn constrain_associated_type_structured_suggestion(
+@@ -370,9 +370,8 @@ pub fn short_ty_string(self, ty: Ty<'tcx>) -> (String, Option<PathBuf>) {
+         ty.hash(&mut s);
+         let hash = s.finish();
+         let path = self.output_filenames(()).temp_path_ext(&format!("long-type-{hash}.txt"), None);
+-        match std::fs::write(&path, &regular) {
+-            Ok(_) => (short, Some(path)),
+-            Err(_) => (regular, None),
+-        }
++
++        // For fuzzing: don't actually write the file
++        (short, Some(path))
      }
- 
-     pub fn short_ty_string(self, ty: Ty<'tcx>) -> (String, Option<PathBuf>) {
--        let length_limit = 50;
-+        let length_limit = usize::MAX;  // don't spam files while fuzzing
-         let type_limit = 4;
-         let regular = FmtPrinter::new(self, hir::def::Namespace::TypeNS)
-             .pretty_print_type(ty)
+ }
