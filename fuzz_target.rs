@@ -1,3 +1,5 @@
+#![feature(new_uninit)]
+#![feature(read_buf)]
 #![no_main]
 #[macro_use] extern crate libfuzzer_sys;
 mod mutator;
@@ -12,6 +14,7 @@ pub struct FuzzCallbacks;
 
 impl rustc_driver::Callbacks for FuzzCallbacks {
     fn after_analysis<'tcx>(&mut self,
+                            _early: &rustc_session::EarlyErrorHandler,
                             _compiler: &rustc_interface::interface::Compiler,
                             _queries: &'tcx rustc_interface::Queries<'tcx>,) -> rustc_driver::Compilation {
         // Stop before codegen.
@@ -23,11 +26,11 @@ impl rustc_driver::Callbacks for FuzzCallbacks {
 /// The idea here is to avoid needing to write to disk.
 struct FuzzFileLoader {
     // The contents of the single input file.
-    input: String,
+    input: Vec<u8>,
 }
 
 impl FuzzFileLoader {
-    fn new(input: String) -> Self {
+    fn new(input: Vec<u8>) -> Self {
         FuzzFileLoader {
             input,
         }
@@ -44,7 +47,27 @@ impl rustc_span::source_map::FileLoader for FuzzFileLoader {
 
     fn read_file(&self, path: &std::path::Path) -> std::io::Result<String> {
         if self.file_exists(path) {
-            Ok(self.input.clone())
+            let s = match String::from_utf8(self.input.to_vec()) {
+                Ok(s) => s,
+                Err(_e) => return Err(std::io::Error::new(std::io::ErrorKind::Other,
+                                                          "not utf8")),
+            };
+            Ok(s)
+        } else {
+            Err(std::io::Error::new(std::io::ErrorKind::NotFound, "tried to open nonexistent file".to_string()))
+        }
+    }
+
+    fn read_binary_file(&self, path: &std::path::Path) -> std::io::Result<rustc_data_structures::sync::Lrc<[u8]>> {
+        use rustc_data_structures::sync::Lrc;
+        use std::io::Read;
+        if self.file_exists(path) {
+            let len = self.input.len();
+            let mut bytes = Lrc::new_uninit_slice(len as usize);
+            let mut buf = std::io::BorrowedBuf::from(Lrc::get_mut(&mut bytes).unwrap());
+            let mut file = std::io::Cursor::new(&self.input[..]);
+            file.read_buf_exact(buf.unfilled())?;
+            Ok(unsafe { bytes.assume_init() })
         } else {
             Err(std::io::Error::new(std::io::ErrorKind::NotFound, "tried to open nonexistent file".to_string()))
         }
@@ -69,7 +92,7 @@ impl rustc_codegen_ssa::traits::CodegenBackend for NullCodegenBackend {
         _sess: &rustc_session::Session,
         _outputs: &rustc_session::config::OutputFilenames,
     ) -> Result<(rustc_codegen_ssa::CodegenResults,
-                 rustc_data_structures::fx::FxHashMap<rustc_middle::dep_graph::WorkProductId,
+                 rustc_data_structures::fx::FxIndexMap<rustc_middle::dep_graph::WorkProductId,
                                                       rustc_middle::dep_graph::WorkProduct>),
                 rustc_errors::ErrorGuaranteed> {
         unimplemented!()
@@ -82,6 +105,10 @@ impl rustc_codegen_ssa::traits::CodegenBackend for NullCodegenBackend {
         _outputs: &rustc_session::config::OutputFilenames,
     ) -> Result<(), rustc_errors::ErrorGuaranteed> {
         unimplemented!()
+    }
+
+    fn locale_resource(&self) -> &'static str {
+        ""
     }
 }
 
@@ -135,7 +162,7 @@ pub fn main_fuzz(input: String) {
     println!("\n```rust\n{}\n```\n\n", &input);
     io::stdout().flush().unwrap();
     let args = rustc_args(&input);
-    let file_loader = Box::new(FuzzFileLoader::new(input));
+    let file_loader = Box::new(FuzzFileLoader::new(input.into()));
     let mut callbacks = FuzzCallbacks;
     let _result = rustc_driver::catch_fatal_errors(|| {
         let mut run_compiler = rustc_driver::RunCompiler::new(&args, &mut callbacks);
