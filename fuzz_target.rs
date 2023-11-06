@@ -14,7 +14,6 @@ pub struct FuzzCallbacks;
 
 impl rustc_driver::Callbacks for FuzzCallbacks {
     fn after_analysis<'tcx>(&mut self,
-                            _early: &rustc_session::EarlyErrorHandler,
                             _compiler: &rustc_interface::interface::Compiler,
                             _queries: &'tcx rustc_interface::Queries<'tcx>,) -> rustc_driver::Compilation {
         // Stop before codegen.
