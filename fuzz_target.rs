@@ -122,7 +122,7 @@ fn rustc_args(input: &str) -> Vec<String> {
     v.push("-Zcrate_attr=feature(const_eval_limit)".to_string());
     v.push("-Zcrate_attr=const_eval_limit=\"1000\"".to_string());
 
-    // recursion limit: down to 24 for #104225 and down to 14 for #104230
+    // recursion limit: down to 24 for #104225 and #105269; down to 14 for #104230
     v.push("-Zcrate_attr=recursion_limit=\"14\"".to_string());
 
     //v.push("-Zverbose".to_string());
