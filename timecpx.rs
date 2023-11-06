@@ -25,7 +25,7 @@ pub fn expected_dur(input: &str) -> Option<Duration> {
         // https://github.com/rust-lang/rust/issues/103421
         ct_ampers > 300 ||
 
-        // idk what this is about; i couldn't even reproduce the slowness outside of the fuzzer
+        // desugars into nested matches
         ct_ques > 100 ||
 
         // Const eval can be arbitrarily slow if the limit is set high enough
@@ -33,17 +33,23 @@ pub fn expected_dur(input: &str) -> Option<Duration> {
         // Revisit after #103877 lands
         input.contains("const_eval_limit") ||
 
-        // https://github.com/rust-lang/rust/issues/104583
+        // https://github.com/rust-lang/rust/issues/117624
         (input.match_indices("dyn").count() > 5 && input.match_indices("Fn").count() > 5 && highest_nesting_normal_delims(&input) > 5) ||
 
         // https://github.com/rust-lang/rust/issues/104871
         (input.contains("||") && input.match_indices("let").count() > 10) ||
 
-        // Macros can and do blow up. Examples include:
+        // Nested macros can cause syntactic blowups:
         //     src/test/ui/issues/issue-65131.rs (10^3)
+        (input.contains("macro_rules") && unique_macro_levels(input) > 3) ||
+
+        // Similarly, nested derives can cause syntactic blowups:
+        //     #[derive(...)] struct Y where B: Q::<{ /* nest */ }]
+        (input.match_indices("derive").count() > 3 && unique_macro_levels(input) > 3) ||
+
+        // Even non-nested macros can cause blowups in the type system:
         //     src/test/ui/enum/issue-42747.rs (4^27) (#104162)
-        // It would be nice to have a more precise way to limit this, perhaps with help from compiler internals
-        (input.contains("macro_rules") && ct_bang > 3)
+        (input.contains("macro_rules") && ct_bang > 7)
     {
         eprintln!("timecpx is recommending to skip this input");
         None
@@ -109,4 +115,27 @@ fn highest_nesting_normal_delims(input: &str) -> usize {
         }
     }
     highest_nest_level
+}
+
+fn unique_macro_levels(input: &str) -> usize {
+    let mut current_nest_level: usize = 0;
+    let mut macro_at_level = vec![false];
+    for b in input.as_bytes() {
+        match b {
+            b'(' | b'[' | b'{' => {
+                current_nest_level += 1;
+                if current_nest_level >= macro_at_level.len() {
+                    macro_at_level.push(false);
+                }
+            }
+            b')' | b']' | b'}' => {
+                current_nest_level = current_nest_level.saturating_sub(1);
+            }
+            b'#' | b'!' => {
+                macro_at_level[current_nest_level] = true;
+            }
+            _ => {}
+        }
+    }
+    macro_at_level.iter().filter(|x| **x).count()
 }

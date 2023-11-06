@@ -12,6 +12,10 @@ pub fn do_not_even_parse(prog: &str) -> bool {
         // https://github.com/rust-lang/rust/issues/105067
         return true;
     }
+    if prog.match_indices("#").count() > 21 && prog.match_indices("!").count() > 7 && prog.match_indices("=").count() > 7 && prog.match_indices("{").count() > 7 {
+        // https://github.com/rust-lang/rust/issues/105165
+        return true;
+    }
     false
 }
 
@@ -76,88 +80,19 @@ pub fn do_not_compile(prog: &str) -> bool {
     if do_not_even_parse(prog) {
         return true;
     }
-    if prog.contains("BikeshedIntrinsicFrom") || prog.contains("rustc_layout") {
-        // https://github.com/rust-lang/rust/issues/103634
-        return true;
-    }
     if prog.contains("generic_const_exprs") || prog.contains("adt_const_params") {
         // https://github.com/rust-lang/rust/issues/103770
-        // https://github.com/rust-lang/rust/issues/104040
-        // https://github.com/rust-lang/rust/issues/94846
-        // https://github.com/rust-lang/rust/issues/101036
+        // https://github.com/rust-lang/rust/issues/106994 (and all issues linked from there)
         return true;
     }
     if prog.contains("specialization") {
         // https://github.com/rust-lang/rust/issues/103708
         return true;
     }
-    if prog.contains("inherent_associated_types") {
-        // https://github.com/rust-lang/rust/issues/104240
-        // https://github.com/rust-lang/rust/issues/104260
-        return true;
-    }
-    //if prog.contains("const") && prog.contains("<") && prog.contains("=") && prog.contains(",") &&
-    //    (prog.contains("impl") || prog.contains("struct") || prog.contains("type") || prog.contains("union") || prog.contains("trait"))
-    //    {
-    //    // https://github.com/rust-lang/rust/issues/104312
-    //    return true;
-    //}
-    if prog.contains("cfg") && prog.contains("derive") {
-        // https://github.com/rust-lang/rust/issues/104367
-        return true;
-    }
-    if prog.contains("cfg_attr") {
-        // https://github.com/rust-lang/rust/issues/104368
-        return true;
-    }
-    if prog.contains("impl") && prog.contains("for") && prog.contains("dyn") {
-        // https://github.com/rust-lang/rust/issues/104327
-        return true;
-    }
-    if prog.contains("impl") && prog.contains("type") && prog.contains("=") {
-        // https://github.com/rust-lang/rust/issues/104551
-        return true;
-    }
-    if prog.contains("extern") && prog.contains("crate") && prog.contains("[") && prog.contains("#") && prog.contains("=") {
-        // https://github.com/rust-lang/rust/issues/104562
-        return true;
-    }
-    if prog.contains("concat_bytes") {
-        // https://github.com/rust-lang/rust/issues/104769
-        return true;
-    }
-    if prog.contains("packed") && prog.contains("union") {
-        // https://github.com/rust-lang/rust/issues/104802
-        return true;
-    }
-    if prog.contains("auto") && prog.contains("trait") && prog.contains("<") {
-        // https://github.com/rust-lang/rust/issues/104808
-        return true;
-    }
     if prog.contains("rustc_peek") {
-        // https://github.com/rust-lang/rust/issues/83461
+        // This intrinsic is expected to ICE if misused:
+        // https://github.com/rust-lang/rust/issues/83461#issuecomment-1467596046
         return true;
     }
-    if prog.contains("trait") && prog.contains("type") && prog.contains("where") && prog.contains("for") && prog.contains("<") && prog.contains(":") && prog.contains("'") {
-        // https://github.com/rust-lang/rust/issues/104916
-        return true;
-    }
-    if prog.contains("raw_ref_op") && prog.contains("const") {
-        // https://github.com/rust-lang/rust/issues/105047
-        return true;
-    }
-    if prog.match_indices("use").count() >= 3 && prog.match_indices("::").count() >= 2 && prog.match_indices("enum").count() >= 2 {
-        // https://github.com/rust-lang/rust/issues/105069
-        return true;
-    }
-    if prog.contains("dyn_star") && prog.contains("as") {
-        // https://github.com/rust-lang/rust/issues/105097
-        return true;
-    }
-    if prog.contains("derive") && prog.contains("Default") && prog.contains("enum") && prog.match_indices("default").count() >= 2 {
-        // https://github.com/rust-lang/rust/issues/105101
-        return true;
-    }
-
     false
 }
